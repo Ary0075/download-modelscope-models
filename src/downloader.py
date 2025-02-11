@@ -190,8 +190,12 @@ class ModelDownloader:
                 os.remove(temp_path)
             return False
 
-    def download_all(self):
-        """使用线程池下载所有文件"""
+    def download_all(self, background=False):
+        """使用线程池下载所有文件
+        
+        Args:
+            background: 是否在后台运行，默认为False
+        """
         from .status_manager import load_download_status
         
         model_files = self.get_model_files()
@@ -210,8 +214,19 @@ class ModelDownloader:
                         break
 
         self.logger.info(f"开始下载模型 {self.model_id} 的文件到 {self.local_dir}")
+        
+        if background:
+            thread = threading.Thread(target=self._download_files)
+            thread.daemon = True
+            thread.start()
+            self.logger.info("已启动后台下载，可以使用 status 命令查看下载进度")
+        else:
+            self._download_files()
+            
+    def _download_files(self):
+        """实际执行下载的内部方法"""
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            results = list(executor.map(self.download_file, model_files))
+            results = list(executor.map(self.download_file, self.current_model_files))
 
         success_count = sum(1 for r in results if r)
-        self.logger.info(f"下载完成: {success_count}/{len(model_files)} 个文件成功")
+        self.logger.info(f"下载完成: {success_count}/{len(self.current_model_files)} 个文件成功")
