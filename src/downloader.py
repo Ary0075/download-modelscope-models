@@ -217,7 +217,6 @@ class ModelDownloader:
         
         if background:
             thread = threading.Thread(target=self._download_files)
-            thread.daemon = True
             thread.start()
             self.logger.info("已启动后台下载，可以使用 status 命令查看下载进度")
         else:

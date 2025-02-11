@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 
 import sys
+import signal
 import argparse
 from src.downloader import ModelDownloader
 from src.status_manager import show_download_status
 from src.logger import default_logger
 from src.config import default_config
+
+def signal_handler(signum, frame):
+    """处理Ctrl+C信号"""
+    if signum == signal.SIGINT:
+        default_logger.info('\n检测到Ctrl+C，程序将在后台继续下载')
+        sys.exit(0)
 
 def download_model(args):
     """下载模型文件"""
@@ -23,6 +30,9 @@ def show_status(args):
     status = show_download_status(args.model_id)
 
 def main():
+    # 注册信号处理器
+    signal.signal(signal.SIGINT, signal_handler)
+    
     parser = argparse.ArgumentParser(description='ModelScope模型下载工具')
     subparsers = parser.add_subparsers(dest='command', help='可用命令')
 
