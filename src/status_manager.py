@@ -15,8 +15,13 @@ def save_download_status(model_id: str, model_files: List[ModelFile]):
         model_id: 模型ID
         model_files: 模型文件列表
     """
+    import time
+    import uuid
+    
     status_file = default_config.get_status_file_path(model_id)
-    temp_file = status_file.with_suffix('.tmp')
+    # 使用时间戳和随机字符串生成唯一的临时文件名
+    temp_suffix = f".{int(time.time())}_{uuid.uuid4().hex[:8]}.tmp"
+    temp_file = status_file.with_suffix(temp_suffix)
     
     # 确保状态文件的父目录存在
     status_file.parent.mkdir(parents=True, exist_ok=True)
@@ -36,13 +41,7 @@ def save_download_status(model_id: str, model_files: List[ModelFile]):
         # 确保临时文件所在目录存在
         temp_file.parent.mkdir(parents=True, exist_ok=True)
         
-        # 如果临时文件已存在，先尝试删除
-        if temp_file.exists():
-            try:
-                temp_file.unlink()
-            except Exception as e:
-                default_logger.error(f"删除已存在的临时文件失败: {str(e)}")
-                return
+        # 由于使用了唯一的临时文件名，不需要检查和删除已存在的临时文件
         
         # 写入临时文件
         try:
@@ -72,6 +71,17 @@ def save_download_status(model_id: str, model_files: List[ModelFile]):
         # 原子性地替换目标文件
         try:
             os.replace(temp_file, status_file)
+            
+            # 清理其他可能存在的临时文件（只清理1小时前的文件）
+            current_time = time.time()
+            for old_temp in status_file.parent.glob(f"{status_file.stem}.*tmp"):
+                try:
+                    # 从文件名中提取时间戳
+                    timestamp = float(old_temp.suffix.split('.')[1])
+                    if current_time - timestamp > 3600:  # 1小时
+                        old_temp.unlink()
+                except (ValueError, IndexError, OSError):
+                    continue
         except Exception as e:
             default_logger.error(f"替换状态文件失败: {str(e)}")
             if temp_file.exists():
