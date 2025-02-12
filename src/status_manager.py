@@ -172,7 +172,7 @@ def show_download_status(model_id: str):
         default_logger.info(f"未找到模型 {model_id} 的下载记录")
         return
 
-    default_logger.info(f"\n模型 {model_id} 的下载状态（每10s更新）:")
+    default_logger.info(f"\n模型 {model_id} 的下载状态:")
     total_size = 0
     downloaded_size = 0
     completed_count = 0
