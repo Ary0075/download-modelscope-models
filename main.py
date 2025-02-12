@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys
+import os
 import signal
 import argparse
 from src.downloader import ModelDownloader
@@ -11,8 +11,7 @@ from src.config import default_config
 def signal_handler(signum, frame):
     """处理Ctrl+C信号"""
     if signum == signal.SIGINT:
-        default_logger.info('\n检测到Ctrl+C，程序将在后台继续下载')
-        sys.exit(0)
+        os._exit(0)  # 使用os._exit()直接退出，避免线程清理
 
 def download_model(args):
     """下载模型文件"""
@@ -23,7 +22,11 @@ def download_model(args):
     )
     if args.chunk_size:
         downloader.config.chunk_size = args.chunk_size
-    downloader.download_all(background=args.background)
+    if args.no_verify:
+        downloader.config.verify_hash = False
+    if args.retry is not None:
+        downloader.config.max_retry = args.retry
+    downloader.download_all()
 
 def show_status(args):
     """显示下载状态"""
@@ -42,7 +45,6 @@ def main():
     download_parser.add_argument('save_dir', help='模型文件保存目录的本地路径')
     download_parser.add_argument('--max-workers', type=int, default=4, help='最大并发下载线程数（默认：4）')
     download_parser.add_argument('--chunk-size', type=int, help='下载块大小，单位为字节（默认：1MB）')
-    download_parser.add_argument('--background', action='store_true', help='启用后台下载模式，可以使用status命令查看进度')
     download_parser.add_argument('--no-verify', action='store_true', help='跳过文件完整性验证')
     download_parser.add_argument('--retry', type=int, default=3, help='下载失败时的重试次数（默认：3）')
 
@@ -53,18 +55,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == 'download':
-        downloader = ModelDownloader(
-            model_id=args.model_id,
-            local_dir=args.save_dir,
-            max_workers=args.max_workers
-        )
-        if args.chunk_size:
-            downloader.config.chunk_size = args.chunk_size
-        if args.no_verify:
-            downloader.config.verify_hash = False
-        if args.retry is not None:
-            downloader.config.max_retry = args.retry
-        downloader.download_all(background=args.background)
+        download_model(args)
     elif args.command == 'status':
         show_status(args)
     else:

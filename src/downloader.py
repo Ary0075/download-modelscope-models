@@ -24,7 +24,7 @@ class ModelFile:
         file_hash: 文件的SHA256哈希值
         download_url: 文件下载URL
         downloaded_size: 已下载的字节数
-        status: 下载状态（pending/downloading/completed/failed）
+        status: 下载状态（pending/downloading/completed/failed/stopped）
     """
     filename: str
     file_size: int
@@ -53,6 +53,7 @@ class ModelDownloader:
         self.config = default_config
         self.logger = default_logger
         self.current_model_files = []
+        self._executor = None
 
     def get_model_files(self) -> List[ModelFile]:
         """获取模型文件列表
@@ -133,14 +134,11 @@ class ModelDownloader:
             bool: 下载是否成功
         """
         from .status_manager import save_download_status
+        import time
         
         local_path = os.path.join(self.local_dir, model_file.filename)
         temp_path = f"{local_path}.tmp"
         model_file.status = 'downloading'
-
-        if os.path.exists(local_path) and self.verify_file(local_path, model_file.file_hash):
-            self.logger.info(f"文件已存在且验证通过: {model_file.filename}")
-            return True
 
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
@@ -156,6 +154,7 @@ class ModelDownloader:
             response = requests.get(model_file.download_url, headers=headers, stream=True)
             total_size = int(response.headers.get('content-length', 0)) + initial_pos
             mode = 'ab' if initial_pos > 0 else 'wb'
+            last_save_time = time.time()
 
             with open(temp_path, mode) as f, tqdm(
                 desc=model_file.filename,
@@ -168,35 +167,32 @@ class ModelDownloader:
                     if chunk:
                         f.write(chunk)
                         pbar.update(len(chunk))
-                        model_file.downloaded_size = initial_pos + pbar.n
-                        if pbar.n % (10 * 1024 * 1024) == 0:
+                        model_file.downloaded_size = os.path.getsize(temp_path)  # 获取实际文件大小
+                        current_time = time.time()
+                        if current_time - last_save_time >= 10:  # 每10秒保存一次
                             save_download_status(self.model_id, self.current_model_files)
+                            last_save_time = current_time
 
             if self.verify_file(temp_path, model_file.file_hash):
                 os.replace(temp_path, local_path)
                 model_file.status = 'completed'
-                save_download_status(self.model_id, self.current_model_files)
                 return True
             else:
                 os.remove(temp_path)
                 self.logger.error(f"文件验证失败: {model_file.filename}")
                 model_file.status = 'failed'
-                save_download_status(self.model_id, self.current_model_files)
                 return False
 
         except Exception as e:
             self.logger.error(f"下载文件失败 {model_file.filename}: {str(e)}")
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+            model_file.status = 'failed'
             return False
 
-    def download_all(self, background=False):
-        """使用线程池下载所有文件
-        
-        Args:
-            background: 是否在后台运行，默认为False
-        """
-        from .status_manager import load_download_status
+    def download_all(self):
+        """使用线程池下载所有文件"""
+        from .status_manager import load_download_status, save_download_status
         
         model_files = self.get_model_files()
         if not model_files:
@@ -213,19 +209,19 @@ class ModelDownloader:
                         model_file.status = file_info['status']
                         break
 
+        # 在开始下载前保存所有文件的初始状态
+        save_download_status(self.model_id, self.current_model_files)
         self.logger.info(f"开始下载模型 {self.model_id} 的文件到 {self.local_dir}")
-        
-        if background:
-            thread = threading.Thread(target=self._download_files)
-            thread.start()
-            self.logger.info("已启动后台下载，可以使用 status 命令查看下载进度")
-        else:
-            self._download_files()
+        self._download_files()
             
     def _download_files(self):
         """实际执行下载的内部方法"""
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            results = list(executor.map(self.download_file, self.current_model_files))
+        self._executor = ThreadPoolExecutor(max_workers=self.max_workers)
+        try:
+            results = list(self._executor.map(self.download_file, self.current_model_files))
+            success_count = sum(1 for r in results if r)
 
-        success_count = sum(1 for r in results if r)
-        self.logger.info(f"下载完成: {success_count}/{len(self.current_model_files)} 个文件成功")
+            self.logger.info(f"下载完成: {success_count}/{len(self.current_model_files)} 个文件成功")
+        finally:
+            self._executor.shutdown(wait=True)
+            self._executor = None
