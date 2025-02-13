@@ -209,6 +209,18 @@ class ModelDownloader:
                         model_file.status = file_info['status']
                         break
 
+        # 检查本地文件是否已存在且哈希值匹配
+        for model_file in model_files:
+            local_path = os.path.join(self.local_dir, model_file.filename)
+            if os.path.exists(local_path):
+                if model_file.file_hash and self.verify_file(local_path, model_file.file_hash):
+                    self.logger.info(f"文件 {model_file.filename} 已存在且验证通过，跳过下载")
+                    model_file.status = 'completed'
+                    model_file.downloaded_size = model_file.file_size
+                    continue
+                else:
+                    self.logger.warning(f"文件 {model_file.filename} 已存在但验证失败，将重新下载")
+
         # 在开始下载前保存所有文件的初始状态
         save_download_status(self.model_id, self.current_model_files)
         self.logger.info(f"开始下载模型 {self.model_id} 的文件到 {self.local_dir}")
