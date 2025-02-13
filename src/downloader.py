@@ -231,11 +231,11 @@ class ModelDownloader:
             self.logger.info("所有文件已下载完成")
             return
             
+        # 保存所有文件的状态信息
+        save_download_status(self.model_id, model_files)
+        
         # 更新current_model_files为需要下载的文件
         self.current_model_files = files_to_download
-        
-        # 在开始下载前保存所有文件的初始状态
-        save_download_status(self.model_id, self.current_model_files)
         self.logger.info(f"开始下载模型 {self.model_id} 的文件到 {self.local_dir}，共 {len(files_to_download)} 个文件待下载")
         self._download_files()
             
