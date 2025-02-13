@@ -225,14 +225,29 @@ class ModelDownloader:
                 else:
                     self.logger.warning(f"文件 {model_file.filename} 已存在但验证失败，将重新下载")
 
+
+        # 保存所有文件的状态信息
+        save_download_status(self.model_id, model_files)
+
         # 过滤出需要下载的文件
         files_to_download = [f for f in self.current_model_files if f.status != 'completed']
         if not files_to_download:
             self.logger.info("所有文件已下载完成")
+            # 清理目标目录中的多余文件
+            # 使用原始文件列表确定要保留的文件
+            original_files = self.get_model_files()
+            expected_files = set(model_file.filename for model_file in original_files)
+            for root, _, files in os.walk(self.local_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    relative_path = os.path.relpath(file_path, self.local_dir)
+                    if relative_path not in expected_files and not file_path.endswith('.tmp'):
+                        try:
+                            os.remove(file_path)
+                            self.logger.info(f"清理多余文件: {relative_path}")
+                        except Exception as e:
+                            self.logger.error(f"清理文件失败 {relative_path}: {str(e)}")
             return
-            
-        # 保存所有文件的状态信息
-        save_download_status(self.model_id, model_files)
         
         # 更新current_model_files为需要下载的文件
         self.current_model_files = files_to_download
