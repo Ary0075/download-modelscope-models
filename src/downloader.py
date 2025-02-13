@@ -173,21 +173,21 @@ class ModelDownloader:
                             save_download_status(self.model_id, self.current_model_files)
                             last_save_time = current_time
 
-            if self.verify_file(temp_path, model_file.file_hash):
-                os.replace(temp_path, local_path)
-                model_file.status = 'completed'
-                return True
-            else:
+            # 只在文件下载完成时验证哈希值
+            if model_file.file_hash and not self.verify_file(temp_path, model_file.file_hash):
                 os.remove(temp_path)
                 self.logger.error(f"文件验证失败: {model_file.filename}")
                 model_file.status = 'failed'
                 return False
+            else:
+                os.replace(temp_path, local_path)
+                model_file.status = 'completed'
+                return True
 
         except Exception as e:
             self.logger.error(f"下载文件失败 {model_file.filename}: {str(e)}")
             if os.path.exists(temp_path):
                 os.remove(temp_path)
-            model_file.status = 'failed'
             return False
 
     def download_all(self):

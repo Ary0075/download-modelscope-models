@@ -177,6 +177,7 @@ def show_download_status(model_id: str):
     downloaded_size = 0
     completed_count = 0
     failed_count = 0
+    failed_files = []
 
     for file_info in status_data['files']:
         total_size += file_info['file_size']
@@ -185,6 +186,7 @@ def show_download_status(model_id: str):
             completed_count += 1
         elif file_info['status'] == 'failed':
             failed_count += 1
+            failed_files.append(os.path.join(default_config.status_dir.parent, file_info['filename']))
 
     if total_size > 0:
         progress = (downloaded_size / total_size) * 100
@@ -194,4 +196,8 @@ def show_download_status(model_id: str):
     default_logger.info(f"总进度: {progress:.1f}%")
     default_logger.info(f"已完成: {completed_count} 个文件")
     default_logger.info(f"失败: {failed_count} 个文件")
+    if failed_files:
+        default_logger.info("\n失败文件列表:")
+        for file_path in failed_files:
+            default_logger.info(f"- {file_path}")
     default_logger.info(f"已下载: {downloaded_size / (1024*1024):.1f}MB / {total_size / (1024*1024):.1f}MB")
