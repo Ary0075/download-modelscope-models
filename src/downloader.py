@@ -225,9 +225,8 @@ class ModelDownloader:
                 else:
                     self.logger.warning(f"文件 {model_file.filename} 已存在但验证失败，将重新下载")
 
-
-        # 保存所有文件的状态信息
-        save_download_status(self.model_id, model_files)
+            # 保存所有文件的状态信息
+            save_download_status(self.model_id, model_files)
 
         # 过滤出需要下载的文件
         files_to_download = [f for f in self.current_model_files if f.status != 'completed']
