@@ -211,6 +211,9 @@ class ModelDownloader:
 
         # 检查本地文件是否已存在且哈希值匹配
         for model_file in model_files:
+            # 保存文件的状态信息
+            save_download_status(self.model_id, model_files)
+
             # 如果文件状态已经是completed，直接跳过验证
             if model_file.status == 'completed':
                 continue
@@ -224,9 +227,6 @@ class ModelDownloader:
                     continue
                 else:
                     self.logger.warning(f"文件 {model_file.filename} 已存在但验证失败，将重新下载")
-
-            # 保存所有文件的状态信息
-            save_download_status(self.model_id, model_files)
 
         # 过滤出需要下载的文件
         files_to_download = [f for f in self.current_model_files if f.status != 'completed']
