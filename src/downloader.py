@@ -240,7 +240,7 @@ class ModelDownloader:
                 for file in files:
                     file_path = os.path.join(root, file)
                     relative_path = os.path.relpath(file_path, self.local_dir)
-                    if relative_path not in expected_files and not file_path.endswith('.tmp'):
+                    if relative_path not in expected_files:
                         try:
                             os.remove(file_path)
                             self.logger.info(f"清理多余文件: {relative_path}")
